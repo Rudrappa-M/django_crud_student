@@ -2,8 +2,9 @@
 Django settings for config project.
 """
 import os
-import django_heroku
 from pathlib import Path
+from django.core.exceptions import ImproperlyConfigured
+import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -12,13 +13,29 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
+RENDER_ENV = os.environ.get("RENDER") is not None
+
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-@wqwpuw9z@l62x#5vss$z+kvy(m1_hm6@lp@*d#upgl@$jz&c-'
+SECRET_KEY = os.environ.get("SECRET_KEY", "dev-only-insecure-secret-key")
+if RENDER_ENV and SECRET_KEY == "dev-only-insecure-secret-key":
+    raise ImproperlyConfigured("SECRET_KEY must be set in the environment on Render.")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+_debug_env = os.environ.get("DEBUG")
+if _debug_env is None:
+    DEBUG = not RENDER_ENV
+else:
+    DEBUG = _debug_env.strip().lower() in {"1", "true", "yes", "y", "on"}
 
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = []
+_allowed_hosts_env = os.environ.get("ALLOWED_HOSTS")
+if _allowed_hosts_env:
+    ALLOWED_HOSTS += [h.strip() for h in _allowed_hosts_env.split(",") if h.strip()]
+_render_external_hostname = os.environ.get("RENDER_EXTERNAL_HOSTNAME")
+if _render_external_hostname:
+    ALLOWED_HOSTS.append(_render_external_hostname)
+if not ALLOWED_HOSTS:
+    ALLOWED_HOSTS = ["localhost", "127.0.0.1", "[::1]"]
 
 
 # Application definition
@@ -37,6 +54,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -70,10 +88,11 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    "default": dj_database_url.config(
+        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
+        conn_max_age=600,
+        ssl_require=RENDER_ENV,
+    )
 }
 
 
@@ -111,12 +130,21 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
-STATIC_ROOT = os.path.join(BASE_DIR, 'static')
+STORAGES = {
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    }
+}
+
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+if _render_external_hostname:
+    CSRF_TRUSTED_ORIGINS = [f"https://{_render_external_hostname}"]
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-django_heroku.settings(locals())
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
