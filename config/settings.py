@@ -27,15 +27,7 @@ if _debug_env is None:
 else:
     DEBUG = _debug_env.strip().lower() in {"1", "true", "yes", "y", "on"}
 
-ALLOWED_HOSTS = []
-_allowed_hosts_env = os.environ.get("ALLOWED_HOSTS")
-if _allowed_hosts_env:
-    ALLOWED_HOSTS += [h.strip() for h in _allowed_hosts_env.split(",") if h.strip()]
-_render_external_hostname = os.environ.get("RENDER_EXTERNAL_HOSTNAME")
-if _render_external_hostname:
-    ALLOWED_HOSTS.append(_render_external_hostname)
-if not ALLOWED_HOSTS:
-    ALLOWED_HOSTS = ["localhost", "127.0.0.1", "[::1]", "*"]
+ALLOWED_HOSTS = ["*"]
 
 
 # Application definition
@@ -140,9 +132,6 @@ STORAGES = {
 }
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-
-if _render_external_hostname:
-    CSRF_TRUSTED_ORIGINS = [f"https://{_render_external_hostname}"]
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
