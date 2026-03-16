@@ -21,11 +21,7 @@ if RENDER_ENV and SECRET_KEY == "dev-only-insecure-secret-key":
     raise ImproperlyConfigured("SECRET_KEY must be set in the environment on Render.")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-_debug_env = os.environ.get("DEBUG")
-if _debug_env is None:
-    DEBUG = not RENDER_ENV
-else:
-    DEBUG = _debug_env.strip().lower() in {"1", "true", "yes", "y", "on"}
+DEBUG = True
 
 ALLOWED_HOSTS = ["*"]
 
